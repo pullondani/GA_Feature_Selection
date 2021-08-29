@@ -5,6 +5,7 @@ import numpy
 import sys
 
 NUM_GEN = 100
+NUM_FEAT = 30
 POP_SIZE = 100
 ELITISM = 0.1
 MUTATION_CHANCE = 0.1
@@ -12,37 +13,37 @@ ALPHA = 0.1
 
 
 def main():
-    info, data = read_file(sys.argv[1])
+    data = read_file('./wbcd.data', './wbcd.names')
+    # solution = run_feature_selection(data)
 
     # Setup up initial population and variables
-    individual_len = info[0]
-    capacity = info[1]
-    solution = run_knapsack(data, individual_len, capacity)
+    # individual_len = info[0]
+    # capacity = info[1]
 
-    vs = [x[0] for x in data]
-    total = 0
-    if solution is not None:
-        for i, value in enumerate(vs):
-            if solution[i] == 1:
-                total += value
+    # vs = [x[0] for x in data]
+    # total = 0
+    # if solution is not None:
+    #     for i, value in enumerate(vs):
+    #         if solution[i] == 1:
+    #             total += value
 
-    print(total)
+    # print(total)
 
 
-def run_knapsack(data, individual_len, capacity):
-    gen_left = NUM_GEN
-    # Randomly initialise individual to have either 0 or 1 for knapsack
-    pop = [[randint(0, 1) for __ in range(individual_len)]
+def run_feature_selection(data):
+    pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
            for ___ in range(POP_SIZE)]
     pop_fit = [None] * POP_SIZE
 
-    values = [row[0] for row in data]
-    weights = [row[1] for row in data]
+    # INITIALISE POPULATION
+
+    # values = [row[0] for row in data]
+    # weights = [row[1] for row in data]
 
     best_feasible = None
     best_fit = 0
 
-    while (gen_left > 0):
+    for __ in NUM_GEN:
         # Calc fitness of current pop
         for i, ind in enumerate(pop):
             pop_fit[i] = calc_feature_selection(ind, values, weights, capacity)
@@ -53,7 +54,6 @@ def run_knapsack(data, individual_len, capacity):
             best_fit = pop_fit[best_ind]
 
         pop = create_new_pop(pop, pop_fit, individual_len)
-        gen_left -= 1
 
     return best_feasible
 
@@ -137,16 +137,35 @@ def create_new_pop(prev_pop, prev_fits, indiv_len):
     return new_pop
 
 
-def read_file(file_name):
+def read_file(data_file, names_file):
     data = []
-    with open(Path(file_name), 'r') as f:
+
+    with open(Path(data_file), 'r') as f:
         reader = csv.reader(f)
         for row in reader:
-            val = list(numpy.fromstring(row[0], dtype=int, sep=' '))
-            if val is not None:
-                data.append(val)
-        fdata = data[1:data[0][0]+1]
-        return data[0], fdata
+            data.append([float(x) for x in row])
+            #TODO Probs need to strip the last num, it's either 1/2
+
+    # print(len(data[0]))
+    sm = 222222
+    lg = -222222
+    for i, row in enumerate(data):
+        v = row[:-1]
+        v.sort()
+
+        if v[0] < sm:
+            sm = v[0]
+            print(i, sm)
+        
+        if v[-1] > lg:
+            lg = v[-1]
+            print(i, lg)
+
+    print(sm, lg)
+
+    # print(1.0/30.0)
+
+    return data
 
 
 if __name__ == '__main__':
