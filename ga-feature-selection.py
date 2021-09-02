@@ -1,12 +1,13 @@
 from pathlib import Path
 from random import randint, choices, random
+from sklearn.preprocessing import KBinsDiscretizer
 import csv
-import numpy
 import sys
+from math import log2
 
 NUM_GEN = 100
 NUM_FEAT = 30
-POP_SIZE = 100
+# POP_SIZE = 100
 ELITISM = 0.1
 MUTATION_CHANCE = 0.1
 ALPHA = 0.1
@@ -14,7 +15,7 @@ ALPHA = 0.1
 
 def main():
     data = read_file('./wbcd.data', './wbcd.names')
-    # solution = run_feature_selection(data)
+    run_feature_selection(data)
 
     # Setup up initial population and variables
     # individual_len = info[0]
@@ -32,8 +33,8 @@ def main():
 
 def run_feature_selection(data):
     pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
-           for ___ in range(POP_SIZE)]
-    pop_fit = [None] * POP_SIZE
+           for ___ in range(len(data))]
+    pop_fit = [None] * len(data)
 
     # INITIALISE POPULATION
 
@@ -43,23 +44,31 @@ def run_feature_selection(data):
     best_feasible = None
     best_fit = 0
 
-    for __ in NUM_GEN:
+    for __ in range(NUM_GEN):
         # Calc fitness of current pop
         for i, ind in enumerate(pop):
-            pop_fit[i] = calc_feature_selection(ind, values, weights, capacity)
+            total = sum(data[i])
+            prob = [x / total for x in data[i]]
+            print(len(prob))
+            
+            # pop_fit[i] = calc_feature_selection(ind, prob)
         # Find new best feasible
-        best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
-        if pop_fit[best_ind] > best_fit:
-            best_feasible = pop[best_ind]
-            best_fit = pop_fit[best_ind]
+        # best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
+        # if pop_fit[best_ind] > best_fit:
+        #     best_feasible = pop[best_ind]
+        #     best_fit = pop_fit[best_ind]
 
-        pop = create_new_pop(pop, pop_fit, individual_len)
+        # pop = create_new_pop(pop, pop_fit, individual_len)
 
-    return best_feasible
+    # return best_feasible
 
 
-def calc_feature_selection():
-    print()
+def calc_feature_selection(individual, probabilities):
+    discretizer = KBinsDiscretizer(n_bins=30, encode='ordinal', strategy='quantile')
+    discretizer.fit(probabilities)
+
+    # p = probability
+    # entropy = -sum([p * log2(p) for _ in range(NUM_FEAT)])
 
 
 # Deep copy arrays and then do elitism.
@@ -147,21 +156,21 @@ def read_file(data_file, names_file):
             #TODO Probs need to strip the last num, it's either 1/2
 
     # print(len(data[0]))
-    sm = 222222
-    lg = -222222
-    for i, row in enumerate(data):
-        v = row[:-1]
-        v.sort()
+    # sm = 222222
+    # lg = -222222
+    # for i, row in enumerate(data):
+    #     v = row[:-1]
+    #     v.sort()
 
-        if v[0] < sm:
-            sm = v[0]
-            print(i, sm)
+    #     if v[0] < sm:
+    #         sm = v[0]
+    #         print(i, sm)
         
-        if v[-1] > lg:
-            lg = v[-1]
-            print(i, lg)
+    #     if v[-1] > lg:
+    #         lg = v[-1]
+    #         print(i, lg)
 
-    print(sm, lg)
+    # print(sm, lg)
 
     # print(1.0/30.0)
 
