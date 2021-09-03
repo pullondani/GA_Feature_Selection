@@ -4,6 +4,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 import csv
 import sys
 from math import log2
+from scipy.stats import entropy
 
 NUM_GEN = 100
 NUM_FEAT = 30
@@ -32,11 +33,11 @@ def main():
 
 
 def run_feature_selection(data):
+    # INITIALISE POPULATION
     pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
            for ___ in range(len(data))]
     pop_fit = [None] * len(data)
 
-    # INITIALISE POPULATION
 
     # values = [row[0] for row in data]
     # weights = [row[1] for row in data]
@@ -44,12 +45,24 @@ def run_feature_selection(data):
     best_feasible = None
     best_fit = 0
 
-    for __ in range(NUM_GEN):
+    probs = []
+    # for __ in range(NUM_GEN):
         # Calc fitness of current pop
-        for i, ind in enumerate(pop):
-            total = sum(data[i])
-            prob = [x / total for x in data[i]]
-            print(len(prob))
+    # for i, ind in enumerate(pop):
+    #     total = sum(data[i])
+    #     probs.append([x / total for x in data[i]])
+
+    # print(len(probs))
+    # print(probs[-1])
+
+    discretizer = KBinsDiscretizer(n_bins=30, encode='ordinal', strategy='quantile')
+    discretizer.fit(data)
+    transformed_data = discretizer.transform(data)
+    fitness = calc_feature_selection(pop[0], transformed_data[0])
+
+    # print(probs[-1])
+
+        # print(prob)
             
             # pop_fit[i] = calc_feature_selection(ind, prob)
         # Find new best feasible
@@ -62,13 +75,33 @@ def run_feature_selection(data):
 
     # return best_feasible
 
+## 
+# Fitness calculation, filter function.
+# Probabilities have been districtised.
+def calc_feature_selection(individual, probabilities, ets=1e-15):
+    # me_e = -sum([p * log2(p + ets) for p in probabilities])
+    # total = 0
+    # print(me_e)
+    # for p in probabilities:
+    #     print('Prob', p)
+    #     curr = p * log2(p)
+    #     print('Each', curr)
+    #     total += curr
+    # total *= -1
 
-def calc_feature_selection(individual, probabilities):
-    discretizer = KBinsDiscretizer(n_bins=30, encode='ordinal', strategy='quantile')
-    discretizer.fit(probabilities)
+    e = entropy(probabilities, base=2)
 
-    # p = probability
-    # entropy = -sum([p * log2(p) for _ in range(NUM_FEAT)])
+    print(probabilities)
+    cond_prob = []
+    selection = []
+    for i in range(len(individual)):
+        if individual[i]:
+            cond_prob.append(probabilities[i])
+            selection.append(i)
+    
+    
+
+    
 
 
 # Deep copy arrays and then do elitism.
@@ -148,12 +181,13 @@ def create_new_pop(prev_pop, prev_fits, indiv_len):
 
 def read_file(data_file, names_file):
     data = []
+    classes = []
 
     with open(Path(data_file), 'r') as f:
         reader = csv.reader(f)
         for row in reader:
-            data.append([float(x) for x in row])
-            #TODO Probs need to strip the last num, it's either 1/2
+            data.append([float(x) for x in row[:-1]])
+            classes.append(row[-1])
 
     # print(len(data[0]))
     # sm = 222222
