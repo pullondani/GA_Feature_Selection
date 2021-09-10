@@ -1,6 +1,7 @@
 from pathlib import Path
 from random import randint, choices, random
 from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.feature_selection import mutual_info_classif
 import csv
 import sys
 from math import log2
@@ -12,10 +13,25 @@ NUM_FEAT = 30
 ELITISM = 0.1
 MUTATION_CHANCE = 0.1
 ALPHA = 0.1
+N_BINS = 30
 
 
 def main():
-    data = read_file('./wbcd.data', './wbcd.names')
+    data, classes = read_file('./wbcd.data', './wbcd.names')
+
+    c1 = 0
+    c2 = 0
+    for i in classes:
+        if i == '1':
+            c1 += 1
+        elif i == '2':
+            c2 += 1
+
+    pc1 = c1 / len(classes)
+    pc2 = c2 / len(classes)
+
+    print(pc1, pc2, len(classes))
+
     run_feature_selection(data)
 
     # Setup up initial population and variables
@@ -38,7 +54,6 @@ def run_feature_selection(data):
            for ___ in range(len(data))]
     pop_fit = [None] * len(data)
 
-
     # values = [row[0] for row in data]
     # weights = [row[1] for row in data]
 
@@ -47,7 +62,7 @@ def run_feature_selection(data):
 
     probs = []
     # for __ in range(NUM_GEN):
-        # Calc fitness of current pop
+    # Calc fitness of current pop
     # for i, ind in enumerate(pop):
     #     total = sum(data[i])
     #     probs.append([x / total for x in data[i]])
@@ -55,31 +70,44 @@ def run_feature_selection(data):
     # print(len(probs))
     # print(probs[-1])
 
-    discretizer = KBinsDiscretizer(n_bins=30, encode='ordinal', strategy='quantile')
+    discretizer = KBinsDiscretizer(
+        n_bins=N_BINS, encode='ordinal', strategy='kmeans')
     discretizer.fit(data)
     transformed_data = discretizer.transform(data)
-    fitness = calc_feature_selection(pop[0], transformed_data[0])
+
+    # print('DATA', data[0])
+    # print('DISCRETIZED', transformed_data[:][0])
+
+    # fitness = calc_feature_selection(
+    #     pop[0], transformed_data[0], 1./float(N_BINS))
 
     # print(probs[-1])
 
-        # print(prob)
-            
-            # pop_fit[i] = calc_feature_selection(ind, prob)
-        # Find new best feasible
-        # best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
-        # if pop_fit[best_ind] > best_fit:
-        #     best_feasible = pop[best_ind]
-        #     best_fit = pop_fit[best_ind]
+    # print(prob)
 
-        # pop = create_new_pop(pop, pop_fit, individual_len)
+    # pop_fit[i] = calc_feature_selection(ind, prob)
+    # Find new best feasible
+    # best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
+    # if pop_fit[best_ind] > best_fit:
+    #     best_feasible = pop[best_ind]
+    #     best_fit = pop_fit[best_ind]
+
+    # pop = create_new_pop(pop, pop_fit, individual_len)
 
     # return best_feasible
 
-## 
+##
 # Fitness calculation, filter function.
 # Probabilities have been districtised.
-def calc_feature_selection(individual, probabilities, ets=1e-15):
-    # me_e = -sum([p * log2(p + ets) for p in probabilities])
+
+
+def calc_feature_selection(subset, dis_individual, prob, ets=1e-15):
+
+    e = -sum([(p) * log2(p) for p in probabilities])
+
+    print(e)
+
+    # print('My entropy', me_e)
     # total = 0
     # print(me_e)
     # for p in probabilities:
@@ -89,19 +117,23 @@ def calc_feature_selection(individual, probabilities, ets=1e-15):
     #     total += curr
     # total *= -1
 
-    e = entropy(probabilities, base=2)
+    # e = entropy(probabilities, base=2)
 
-    print(probabilities)
-    cond_prob = []
-    selection = []
-    for i in range(len(individual)):
-        if individual[i]:
-            cond_prob.append(probabilities[i])
-            selection.append(i)
-    
-    
+    # print('their entropy', e)
 
-    
+
+    # cond_prob = []
+    # selection = []
+    # for i in range(len(individual)):
+    #     if individual[i]:
+    #         cond_prob.append(probabilities[i])
+    #         selection.append(i)
+
+    # cond_e = entropy(cond_prob, base=2)
+
+    # val = mutual_info_classif(probabilities, cond_prob)
+
+    # print('their mutual', val)
 
 
 # Deep copy arrays and then do elitism.
@@ -199,7 +231,7 @@ def read_file(data_file, names_file):
     #     if v[0] < sm:
     #         sm = v[0]
     #         print(i, sm)
-        
+
     #     if v[-1] > lg:
     #         lg = v[-1]
     #         print(i, lg)
@@ -208,7 +240,7 @@ def read_file(data_file, names_file):
 
     # print(1.0/30.0)
 
-    return data
+    return classes, data
 
 
 if __name__ == '__main__':
