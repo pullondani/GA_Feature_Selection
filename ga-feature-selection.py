@@ -9,7 +9,7 @@ from scipy.stats import entropy
 
 NUM_GEN = 100
 NUM_FEAT = 30
-# POP_SIZE = 100
+POP_SIZE = 100
 ELITISM = 0.1
 MUTATION_CHANCE = 0.1
 ALPHA = 0.1
@@ -22,68 +22,34 @@ def main():
     c1 = 0
     c2 = 0
     for i in classes:
-        if i == '1':
+        if i == 1:
             c1 += 1
-        elif i == '2':
+        elif i == 2:
             c2 += 1
 
     pc1 = c1 / len(classes)
     pc2 = c2 / len(classes)
 
-    print(pc1, pc2, len(classes))
-
-    run_feature_selection(data)
-
-    # Setup up initial population and variables
-    # individual_len = info[0]
-    # capacity = info[1]
-
-    # vs = [x[0] for x in data]
-    # total = 0
-    # if solution is not None:
-    #     for i, value in enumerate(vs):
-    #         if solution[i] == 1:
-    #             total += value
-
-    # print(total)
+    run_feature_selection(data, [pc1, pc2], classes)
 
 
-def run_feature_selection(data):
+def run_feature_selection(data, probabilities, classes):
     # INITIALISE POPULATION
     pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
            for ___ in range(len(data))]
     pop_fit = [None] * len(data)
 
-    # values = [row[0] for row in data]
-    # weights = [row[1] for row in data]
-
     best_feasible = None
     best_fit = 0
-
-    probs = []
-    # for __ in range(NUM_GEN):
-    # Calc fitness of current pop
-    # for i, ind in enumerate(pop):
-    #     total = sum(data[i])
-    #     probs.append([x / total for x in data[i]])
-
-    # print(len(probs))
-    # print(probs[-1])
 
     discretizer = KBinsDiscretizer(
         n_bins=N_BINS, encode='ordinal', strategy='kmeans')
     discretizer.fit(data)
     transformed_data = discretizer.transform(data)
 
-    # print('DATA', data[0])
-    # print('DISCRETIZED', transformed_data[:][0])
+    class_prob = probabilities[classes[0] - 1]
 
-    # fitness = calc_feature_selection(
-    #     pop[0], transformed_data[0], 1./float(N_BINS))
-
-    # print(probs[-1])
-
-    # print(prob)
+    fitness = calc_feature_selection(pop[0], transformed_data[0], class_prob)
 
     # pop_fit[i] = calc_feature_selection(ind, prob)
     # Find new best feasible
@@ -96,16 +62,13 @@ def run_feature_selection(data):
 
     # return best_feasible
 
-##
 # Fitness calculation, filter function.
-# Probabilities have been districtised.
-
-
-def calc_feature_selection(subset, dis_individual, prob, ets=1e-15):
-
-    e = -sum([(p) * log2(p) for p in probabilities])
-
-    print(e)
+def calc_feature_selection(subset_x, dis_vals, prob):
+    print(prob)
+    e = -sum([prob * log2(prob) for _ in range(len(dis_vals))])
+    en = entropy([prob] * len(dis_vals), base=2)
+    print('e', e)
+    print('en', en)
 
     # print('My entropy', me_e)
     # total = 0
@@ -117,10 +80,7 @@ def calc_feature_selection(subset, dis_individual, prob, ets=1e-15):
     #     total += curr
     # total *= -1
 
-    # e = entropy(probabilities, base=2)
-
     # print('their entropy', e)
-
 
     # cond_prob = []
     # selection = []
@@ -219,28 +179,9 @@ def read_file(data_file, names_file):
         reader = csv.reader(f)
         for row in reader:
             data.append([float(x) for x in row[:-1]])
-            classes.append(row[-1])
+            classes.append(int(row[-1]))
 
-    # print(len(data[0]))
-    # sm = 222222
-    # lg = -222222
-    # for i, row in enumerate(data):
-    #     v = row[:-1]
-    #     v.sort()
-
-    #     if v[0] < sm:
-    #         sm = v[0]
-    #         print(i, sm)
-
-    #     if v[-1] > lg:
-    #         lg = v[-1]
-    #         print(i, lg)
-
-    # print(sm, lg)
-
-    # print(1.0/30.0)
-
-    return classes, data
+    return data, classes
 
 
 if __name__ == '__main__':
