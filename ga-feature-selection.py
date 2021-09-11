@@ -4,7 +4,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.feature_selection import mutual_info_classif
 import csv
 import sys
-from math import log2
+from math import log, log2
 from scipy.stats import entropy
 
 NUM_GEN = 100
@@ -18,7 +18,10 @@ N_BINS = 30
 
 def main():
     data, classes = read_file('./wbcd.data', './wbcd.names')
+    run_feature_selection(data, calc_class_probs(classes), classes)
 
+
+def calc_class_probs(classes):
     c1 = 0
     c2 = 0
     for i in classes:
@@ -30,28 +33,28 @@ def main():
     pc1 = c1 / len(classes)
     pc2 = c2 / len(classes)
 
-    run_feature_selection(data, [pc1, pc2], classes)
+    return [pc1, pc2]
 
 
-def run_feature_selection(data, probabilities, classes):
+def run_feature_selection(data, class_probs, classes):
     # INITIALISE POPULATION
     pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
            for ___ in range(len(data))]
-    pop_fit = [None] * len(data)
 
-    best_feasible = None
-    best_fit = 0
+    # pop_fit = [None] * len(data)
+    # best_feasible = None
+    # best_fit = 0
 
     discretizer = KBinsDiscretizer(
         n_bins=N_BINS, encode='ordinal', strategy='kmeans')
     discretizer.fit(data)
     transformed_data = discretizer.transform(data)
 
-    class_prob = probabilities[classes[0] - 1]
+    ent = -sum([prob * log2(prob) for prob in class_probs])
 
-    fitness = calc_feature_selection(pop[0], transformed_data[0], class_prob)
+    fitness = calc_feature_selection(pop[0], transformed_data, ent, classes)
 
-    # pop_fit[i] = calc_feature_selection(ind, prob)
+
     # Find new best feasible
     # best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
     # if pop_fit[best_ind] > best_fit:
@@ -63,24 +66,46 @@ def run_feature_selection(data, probabilities, classes):
     # return best_feasible
 
 # Fitness calculation, filter function.
-def calc_feature_selection(subset_x, dis_vals, prob):
-    print(prob)
-    e = -sum([prob * log2(prob) for _ in range(len(dis_vals))])
-    en = entropy([prob] * len(dis_vals), base=2)
-    print('e', e)
-    print('en', en)
+def calc_feature_selection(individual, data, ent, classes):
+    # TODO So there's only one entropy value!??
+    # Its not about the rows at all. The individuals are just what features to select. There are 30 features
+    
+    rows_count = len(data)
+    
+    # Count class occurences
+    c1 = 0
+    c2 = 0
+    for i in classes:
+        if i == 1:
+            c1 += 1
+        elif i == 2:
+            c2 += 1
 
-    # print('My entropy', me_e)
-    # total = 0
-    # print(me_e)
-    # for p in probabilities:
-    #     print('Prob', p)
-    #     curr = p * log2(p)
-    #     print('Each', curr)
-    #     total += curr
-    # total *= -1
+    for col in individual:
+        bins_count = [0] * N_BINS
+        class_1_count = [0] * N_BINS
+        class_2_count = [0] * N_BINS
+        if col == 1:
+            for row in range(len(data)):
+                bins_count[data[row][col]] += 1
+                if classes[row] == 1:
+                    class_1_count[data[row][col]] += 1
+                elif classes[row] == 2:
+                    class_2_count[data[row][col]] += 1
+            
+            total = 0
+            for i in range(N_BINS):
+                pX = float(bins_count[i]) / float(rows_count)
+                pY_1 = float(class_1_count[i]) / float(c1)
+                pY_2 = float(class_2_count[i]) / float(c2)
 
-    # print('their entropy', e)
+                total += (pX * pY_1 * log2(pY_1)) + (pX * pY_2 * log2(pY_2))
+
+
+
+
+
+
 
     # cond_prob = []
     # selection = []
@@ -88,12 +113,6 @@ def calc_feature_selection(subset_x, dis_vals, prob):
     #     if individual[i]:
     #         cond_prob.append(probabilities[i])
     #         selection.append(i)
-
-    # cond_e = entropy(cond_prob, base=2)
-
-    # val = mutual_info_classif(probabilities, cond_prob)
-
-    # print('their mutual', val)
 
 
 # Deep copy arrays and then do elitism.

@@ -1,0 +1,10 @@
+
+
+
+H(Y|X)=
+P(f=f1) * -p(class1|f=f1) * log(p(class1|f=f1)) 
+		  -p(class2|f=f1) * log(p(class2|f=f1))
++ 
+P(f=f2) * -p(class1|f=f2) * log(p(class1|f=f2)) 
+		  -p(class2|f=f2) * log(p(class2|f=f2))
+
