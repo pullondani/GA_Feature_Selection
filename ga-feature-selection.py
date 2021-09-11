@@ -4,11 +4,11 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.feature_selection import mutual_info_classif
 import csv
 import sys
-from math import log, log2
+from math import log2
 from scipy.stats import entropy
 
 NUM_GEN = 100
-NUM_FEAT = 30
+# NUM_FEAT = 30
 POP_SIZE = 100
 ELITISM = 0.1
 MUTATION_CHANCE = 0.1
@@ -17,8 +17,9 @@ N_BINS = 30
 
 
 def main():
-    data, classes = read_file('./wbcd.data', './wbcd.names')
-    run_feature_selection(data, calc_class_probs(classes), classes)
+    data, classes, feature_count = read_file('./wbcd.data', './wbcd.names')
+    print(feature_count)
+    run_feature_selection(data, classes, feature_count)
 
 
 def calc_class_probs(classes):
@@ -36,14 +37,15 @@ def calc_class_probs(classes):
     return [pc1, pc2]
 
 
-def run_feature_selection(data, class_probs, classes):
+def run_feature_selection(data, classes, feature_count):
+    class_probs = calc_class_probs(classes)
     # INITIALISE POPULATION
-    pop = [[randint(0, 1) for __ in range(NUM_FEAT)]
-           for ___ in range(len(data))]
+    pop = [[randint(0, 1) for __ in range(feature_count)]
+           for ___ in range(POP_SIZE)]
 
-    # pop_fit = [None] * len(data)
-    # best_feasible = None
-    # best_fit = 0
+    pop_fit = [None] * POP_SIZE
+    best_feasible = None
+    best_fit = 0
 
     discretizer = KBinsDiscretizer(
         n_bins=N_BINS, encode='ordinal', strategy='kmeans')
@@ -52,24 +54,24 @@ def run_feature_selection(data, class_probs, classes):
 
     ent = -sum([prob * log2(prob) for prob in class_probs])
 
-    fitness = calc_feature_selection(pop[0], transformed_data, ent, classes)
+    for __ in range(NUM_GEN):
+        for i in range(len(pop)):
+            pop_fit[i] = calc_feature_selection(pop[i], transformed_data, ent, classes)
 
+        # Find new best feasible
+        best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
+        if pop_fit[best_ind] > best_fit:
+            best_feasible = pop[best_ind]
+            best_fit = pop_fit[best_ind]
 
-    # Find new best feasible
-    # best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
-    # if pop_fit[best_ind] > best_fit:
-    #     best_feasible = pop[best_ind]
-    #     best_fit = pop_fit[best_ind]
+        pop = create_new_pop(pop, pop_fit, feature_count)
+        pop_fit = [None] * POP_SIZE
 
-    # pop = create_new_pop(pop, pop_fit, individual_len)
-
-    # return best_feasible
+    return best_feasible
 
 # Fitness calculation, filter function.
 def calc_feature_selection(individual, data, ent, classes):
-    # TODO So there's only one entropy value!??
     # Its not about the rows at all. The individuals are just what features to select. There are 30 features
-    
     rows_count = len(data)
     
     # Count class occurences
@@ -81,38 +83,35 @@ def calc_feature_selection(individual, data, ent, classes):
         elif i == 2:
             c2 += 1
 
-    for col in individual:
+    total = 0
+    for col, indiv_val in enumerate(individual):
         bins_count = [0] * N_BINS
         class_1_count = [0] * N_BINS
         class_2_count = [0] * N_BINS
-        if col == 1:
+        if indiv_val == 1:
             for row in range(len(data)):
-                bins_count[data[row][col]] += 1
+                ind = int(data[row][col])
+                bins_count[ind] += 1
                 if classes[row] == 1:
-                    class_1_count[data[row][col]] += 1
+                    class_1_count[ind] += 1
                 elif classes[row] == 2:
-                    class_2_count[data[row][col]] += 1
+                    class_2_count[ind] += 1
             
-            total = 0
             for i in range(N_BINS):
                 pX = float(bins_count[i]) / float(rows_count)
                 pY_1 = float(class_1_count[i]) / float(c1)
                 pY_2 = float(class_2_count[i]) / float(c2)
 
-                total += (pX * pY_1 * log2(pY_1)) + (pX * pY_2 * log2(pY_2))
+                pY_1_calc = (pX * pY_1 * log2(pY_1)) if pY_1 != 0 else 0
+                pY_2_calc = (pX * pY_2 * log2(pY_2)) if pY_2 != 0 else 0
+                total += pY_1_calc + pY_2_calc
+            
+    total *= -1
 
+    # TODO Something isn't right with the total...
+    print(ent, total, ent - total)
+    return ent - total
 
-
-
-
-
-
-    # cond_prob = []
-    # selection = []
-    # for i in range(len(individual)):
-    #     if individual[i]:
-    #         cond_prob.append(probabilities[i])
-    #         selection.append(i)
 
 
 # Deep copy arrays and then do elitism.
@@ -160,16 +159,14 @@ def crossover_selection(pop, indiv_len):
 def mutation_selection(pop, indiv_len):
     for indiv in pop:
         if random() <= MUTATION_CHANCE:
-            # clone = indiv.copy()
             flip_ind = randint(0, indiv_len-1)
+            print(flip_ind, indiv_len, indiv)
             indiv[flip_ind] = 0 if indiv[flip_ind] == 1 else 1
-            # print('MUTATION! AT INDEX ' + str(flip_ind), clone, '->', indiv)
 
     return pop
 
 
 def create_new_pop(prev_pop, prev_fits, indiv_len):
-    # TODO Should I be removing the ELITE individuals once they are selected??
     new_pop = elitism_selection(prev_pop, prev_fits)
 
     while (len(new_pop) < POP_SIZE):
@@ -200,7 +197,11 @@ def read_file(data_file, names_file):
             data.append([float(x) for x in row[:-1]])
             classes.append(int(row[-1]))
 
-    return data, classes
+    with open(Path(names_file), 'r') as f:
+        reader = csv.reader(f)
+        feature_count = sum(1 for row in reader) - 1 # Remove header row by minusing 1.. lol
+
+    return data, classes, feature_count
 
 
 if __name__ == '__main__':
