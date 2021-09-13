@@ -2,7 +2,7 @@ import copy
 from pathlib import Path
 from random import randint, choices, random
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.feature_selection import mutual_info_classif
+from sklearn.feature_selection import SequentialFeatureSelector
 import csv
 from math import log2
 from scipy.stats import entropy
@@ -10,68 +10,84 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from copy import deepcopy, copy
 from sklearn.naive_bayes import CategoricalNB
+from sklearn.neighbors import KNeighborsClassifier
+import sys
 
 
-NUM_GEN = 10
+NUM_GEN = 100
 POP_SIZE = 50
 ELITISM = 0.2
-MUTATION_CHANCE = 0.5
-N_BINS = 10
+MUTATION_CHANCE = 0.1
+N_BINS = 30
 
 
 def main():
-    subsets = []
-    
-    data, classes, feature_count = read_file('./wbcd.data', './wbcd.names')
+    data, classes, feature_count = read_file(str(sys.argv[1]), str(sys.argv[2]))
 
     discretizer = KBinsDiscretizer(
         n_bins=N_BINS, encode='ordinal', strategy='kmeans')
     discretizer.fit(data)
     transformed_data = discretizer.transform(data)
 
-    for i in range(1, 5):
-        start_filter = datetime.now()
-        best_feasible, best_fit, history, best_ent = run_feature_selection(transformed_data, deepcopy(classes), copy(feature_count))
-        end_filter = datetime.now()
-        subsets.append(best_feasible)
-        print('Run', i, 'Time elapsed: ' + str(end_filter - start_filter))
+    for i in range(1, 6):
+        start = datetime.now()
+        wrapper_function(deepcopy(transformed_data), classes)
+        end = datetime.now()
 
-    # for subset in subsets:
-    subset = subsets[0]
-    num_cols = sum(subset)
-    subset_data = [[0 for x in range(num_cols)] for y in range(len(transformed_data))]
+        print('Completed wrapper in:', end - start)
 
-    subset_col = 0
-    for col, val in enumerate(subset):
-        if val == 1:
-            for row in range(len(transformed_data)):
-                subset_data[row][subset_col] = transformed_data[row][col]
-            subset_col += 1
-
-    test_size = 199 #int(len(subset_data)/2)
-
-    clf = CategoricalNB()
-    clf.fit(subset_data[:-test_size], classes[:-test_size])
-    len(subset_data[-test_size:])
-    knn = clf.predict(subset_data[-test_size:])
-    print(len(knn))
-
-    right = 0
-    test = classes[-test_size:]
-    for i, c in enumerate(knn):
-        if c == test[i]:
-            right += 1
     
-    print(str((right / test_size * 100)) + '% Correctly Classified')
-    print(best_feasible, best_fit, best_ent)
+    history = run_filter(transformed_data, classes, copy(feature_count))
 
-    plt.plot(list(range(NUM_GEN)), history, label='Mean Fitness')
+    plt.plot(list(range(NUM_GEN)), history, label='Fitness')
     plt.legend()
     plt.title('Fitness through the generations')
     plt.xlabel('Generations')
     plt.ylabel('Fitness')
     plt.show()
 
+def run_filter(data, classes, feature_count):
+    subsets = []
+    history = None
+    for i in range(1, 6):
+        start_filter = datetime.now()
+        best_feasible, best_fit, history, best_ent = run_feature_selection(data, deepcopy(classes), copy(feature_count))
+        end_filter = datetime.now()
+        subsets.append(best_feasible)
+        print('Run', i, 'Time elapsed: ' + str(end_filter - start_filter))
+    
+
+    for s, subset in enumerate(subsets):
+        print('SUBSET ', s + 1)
+        classify(subset, data, classes)
+        
+    return history
+
+
+def classify(subset, data, classes):
+    num_cols = sum(subset)
+    subset_data = [[0 for x in range(num_cols)] for y in range(len(data))]
+
+    subset_col = 0
+    for col, val in enumerate(subset):
+        if val == 1:
+            for row in range(len(data)):
+                subset_data[row][subset_col] = data[row][col]
+            subset_col += 1
+
+    clf = CategoricalNB()
+    clf.fit(subset_data, classes) 
+
+    pred = clf.predict(subset_data[:30])
+    right = 0
+    test = classes[:30]
+    for i, c in enumerate(pred):
+        if c == test[i]:
+            right += 1
+
+    print(str((right / 30 * 100)) + '% Correctly Classified')
+
+    return right / 30
 
 
 def run_feature_selection(data, classes, feature_count):
@@ -91,8 +107,7 @@ def run_feature_selection(data, classes, feature_count):
     ent = -sum([prob * log2(prob) for prob in class_probs])
 
     for __ in range(NUM_GEN):
-        print('GEN', __)
-        # print(pop[:5])
+        # print('GEN', __)
         for i in range(len(pop)):
             pop_fit[i], pop_ent[i] = calc_mutual_information(pop[i], data, ent, classes)
 
@@ -100,10 +115,8 @@ def run_feature_selection(data, classes, feature_count):
         best_ind = max(range(len(pop_fit)), key=pop_fit.__getitem__)
         best_ent = min(pop_ent)
 
-        if pop_ent[best_ind] != best_ent:
-            print(pop_ent[best_ind], best_ent)
         history.append(pop_ent[best_ind])
-        # print(best_ind, pop_fit[best_ind])
+
         if pop_fit[best_ind] > best_fit:
             best_feasible = pop[best_ind]
             best_fit = pop_fit[best_ind]
@@ -115,6 +128,7 @@ def run_feature_selection(data, classes, feature_count):
         pop_fit = [None] * POP_SIZE
 
     return best_feasible, best_fit, history, best_ent
+
 
 # Fitness calculation, filter function.
 def calc_mutual_information(individual, data, ent, classes):
@@ -155,12 +169,21 @@ def calc_mutual_information(individual, data, ent, classes):
             
     total *= -1
 
-    # TODO Something isn't right with the total...
-    # print(ent - total)
-
     # YOU WANT LOW ENTROPY!!!!!
     # BUT YOU WANT HIGH MUTUAL INFORMATION (which is the equation below!)
     return ent - total, total
+
+
+def wrapper_function(data, classes):
+    knn = KNeighborsClassifier(n_neighbors=N_BINS)
+    sfs = SequentialFeatureSelector(knn, n_features_to_select=10, direction='backward')
+    sfs = sfs.fit(data, classes)
+    subset = sfs.get_support()
+
+
+    print('Classifying the wrapper function')
+    fitness = classify(subset, data, classes)
+    return sfs.transform(data)
 
 
 def calc_class_probs(classes):
@@ -224,7 +247,6 @@ def mutation_selection(pop, indiv_len):
     for indiv in pop:
         if random() <= MUTATION_CHANCE:
             flip_ind = randint(0, indiv_len-1)
-            # print(flip_ind, indiv_len, indiv)
             indiv[flip_ind] = 0 if indiv[flip_ind] == 1 else 1
 
     return pop
