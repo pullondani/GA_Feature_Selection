@@ -39,7 +39,8 @@ def main():
     
     history = run_filter(transformed_data, classes, copy(feature_count))
 
-    plt.plot(list(range(NUM_GEN)), history, label='Fitness')
+    for i in range(len(history)):
+        plt.plot(list(range(NUM_GEN)), history[i], label='Fitness '+str(i))
     plt.legend()
     plt.title('Fitness through the generations')
     plt.xlabel('Generations')
@@ -48,10 +49,10 @@ def main():
 
 def run_filter(data, classes, feature_count):
     subsets = []
-    history = None
+    history = [None for x in range(5)]
     for i in range(1, 6):
         start_filter = datetime.now()
-        best_feasible, best_fit, history, best_ent = run_feature_selection(data, deepcopy(classes), copy(feature_count))
+        best_feasible, best_fit, history[i-1], best_ent = run_feature_selection(data, deepcopy(classes), copy(feature_count))
         end_filter = datetime.now()
         subsets.append(best_feasible)
         print('Run', i, 'Time elapsed: ' + str(end_filter - start_filter))
